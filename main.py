@@ -73,28 +73,59 @@ def fetch_messages(
 	return messages
 
 
-def traverse_reply_chain(session: requests.Session, root_message: dict[str, str]) -> list[dict[str, str]]:
-	chain: list[dict[str, str]] = [{"content": root_message["content"], "author": root_message["author"]}]
+def traverse_reply_chain(
+	session: requests.Session, root_message: dict[str, str], context_messages: int, seen_ids: set[str]
+) -> list[dict[str, str]]:
+	chain: list[dict[str, str]] = []
+	seen_ids.add(root_message["id"])
+	chain.append({"id": root_message["id"], "content": root_message["content"], "author": root_message["author"]})
 	current_message = root_message
 
 	while "referenced_message_id" in current_message and "referenced_channel_id" in current_message:
-		print(f"[{root_message['id']}] fetching message {current_message['referenced_message_id']}...")
+		print(
+			f"[{root_message['id']}] fetching {context_messages} messages around {current_message['referenced_message_id']}..."
+		)
 		r = session.get(
 			f"{DISCORD_BASE_URL}/channels/{current_message['referenced_channel_id']}/messages",
-			params={"around": current_message["referenced_message_id"], "limit": 1},
+			params={"around": current_message["referenced_message_id"], "limit": context_messages},
 		)
 
-		fetched = r.json()[0]
-		current_message = {
-			"id": fetched["id"],
-			"content": fetched["content"],
-			"author": fetched["author"]["username"],
-		}
-		if "message_reference" in fetched:
-			current_message["referenced_channel_id"] = fetched["message_reference"]["channel_id"]
-			current_message["referenced_message_id"] = fetched["message_reference"]["message_id"]
+		fetched_messages = r.json()
 
-		chain.insert(0, {"content": current_message["content"], "author": current_message["author"]})
+		next_message = None
+		for fetched in fetched_messages:
+			if fetched["id"] == current_message["referenced_message_id"]:
+				next_message = fetched
+				break
+
+		message_block: list[dict[str, str]] = []
+		for fetched in fetched_messages:
+			if fetched["id"] not in seen_ids:
+				seen_ids.add(fetched["id"])
+				message_block.append(
+					{
+						"id": fetched["id"],
+						"content": fetched["content"],
+						"author": fetched["author"]["username"],
+					}
+				)
+
+		# should already be returned in reverse chronological order by discord
+		message_block.reverse()
+		chain = message_block + chain
+
+		if next_message is None:
+			print(f"[{root_message['id']}] could not find next message to continue chain!")
+			break
+
+		current_message = {
+			"id": next_message["id"],
+			"content": next_message["content"],
+			"author": next_message["author"]["username"],
+		}
+		if "message_reference" in next_message:
+			current_message["referenced_channel_id"] = next_message["message_reference"]["channel_id"]
+			current_message["referenced_message_id"] = next_message["message_reference"]["message_id"]
 
 		# todo: rate limiting
 		sleep(1)
@@ -116,6 +147,7 @@ def search(
 	token: Annotated[str, typer.Option(help="Discord authentication token", prompt=True)],
 	amount: Annotated[int, typer.Option(help="Number of messages to search for", prompt=True, max=10000)] = 25,
 	slop: Annotated[int, typer.Option(help="Max number of words to skip between matching tokens", max=100)] = 2,
+	context_amount: Annotated[int, typer.Option(help="Number of context messages to fetch at each chain step")] = 10,
 	include_bots: Annotated[bool, typer.Option()] = False,
 	include_webhooks: Annotated[bool, typer.Option()] = False,
 	oldest_first: Annotated[bool, typer.Option()] = False,
@@ -129,7 +161,8 @@ def search(
 		return
 
 	print("traversing reply chains...")
-	chains = [traverse_reply_chain(session, msg) for msg in messages]
+	seen_ids: set[str] = set()
+	chains = [traverse_reply_chain(session, msg, context_amount, seen_ids) for msg in messages]
 
 	print("done!")
 
