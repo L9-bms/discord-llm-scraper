@@ -1,1 +1,5 @@
-messages.json
+.env
+messages*.json
+embedded*.json
+.idea/
+**/__pycache__/
