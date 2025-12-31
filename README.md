@@ -57,6 +57,12 @@ DISCORD_TOKEN=your_discord_token
 OPENROUTER_API_KEY=your_openrouter_key
 ```
 
+## In action
+
+![search](docs/img/search.png)
+![extract](docs/img/extract.png)
+![ask](docs/img/ask.png)
+
 ## Potential extensions
 
 - Agentic search - AI search term discovery based on query
