@@ -2,31 +2,33 @@ from typing import List
 
 from openai import OpenAI
 
-from summarise import Summary
+from summary import Summary
 
 
-def answer_query_streaming(
-	client: OpenAI,
-	query: str,
-	results: List[tuple[Summary, float]],
-	model: str,
-):
+def create_prompt(query: str, results: List[tuple[Summary, float]]) -> str:
 	context_parts = []
-	for i, (summary, score) in enumerate(results, 1):
+	for i, (summary, _score) in enumerate(results, 1):
 		context_parts.append(f"{i}. Topic: {summary.topic}. Info: {summary.info}")
 
 	context = "\n".join(context_parts)
 
-	# Stream the response
-	stream = client.responses.create(
-		model=model,
-		instructions="You are an assistant that answers questions based on given knowledge.",
-		input=f"""Use the knowledge below to answer the subsequent question. If the answer cannot be found in the knowledge, write "I could not find an answer.
+	return f"""Use the knowledge below to answer the subsequent question. If the answer cannot be found in the knowledge, write "I could not find an answer.
 
 Knowledge snippets:
 {context}
 
-Question: {query}""",
+Question: {query}"""
+
+
+def answer_query_streaming(
+	client: OpenAI,
+	prompt: str,
+	model: str,
+):
+	stream = client.responses.create(
+		model=model,
+		instructions="You are an assistant that answers questions based on given knowledge.",
+		input=prompt,
 		stream=True,
 	)
 

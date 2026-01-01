@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 from openai import OpenAI
 
-from summarise import Summary
+from summary import Summary
 
 
 def compute_embeddings(client: OpenAI, summaries: list[Summary], model: str) -> List[List[float]]:

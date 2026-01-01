@@ -2,7 +2,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 from rich import print
 
-from discord import Chain
+from search import Chain
 
 
 class Summary(BaseModel):

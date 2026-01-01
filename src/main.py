@@ -1,4 +1,3 @@
-import json
 from typing import Annotated
 
 import requests
@@ -9,11 +8,11 @@ from rich import print
 from rich.live import Live
 from rich.markdown import Markdown
 
-from discord import Chain, fetch_messages, traverse_reply_chain
-from embedding import compute_embeddings, search_embeddings
-from query import answer_query_streaming
-from summarise import Summary, summarise_chain
-from util import extend_array_json, load_seen_ids
+from embed import compute_embeddings, search_embeddings
+from query import answer_query_streaming, create_prompt
+from search import Chain, fetch_messages, traverse_reply_chain
+from summary import Summary, summarise_chain
+from util import extend_array_json, load_json, load_seen_ids, save_json
 
 load_dotenv()
 app = typer.Typer()
@@ -81,8 +80,7 @@ def extract(
 	summary_model: Annotated[str, typer.Option()] = "openai/gpt-oss-120b",
 	embedding_model: Annotated[str, typer.Option()] = "qwen/qwen3-embedding-8b",
 ) -> None:
-	file = open("messages.json", "r")
-	threads = json.load(file)
+	threads = load_json("messages.json")
 	print("loaded threads from messages.json")
 
 	client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=openrouter_key)
@@ -104,8 +102,7 @@ def extract(
 		"metadata": {"count": len(summaries), "embedding_dim": len(embeddings[0]) if embeddings else 0},
 	}
 
-	file = open("embedded.json", "w")
-	json.dump(data, file)
+	save_json("embedded.json", data)
 	print("wrote to embedded.json")
 
 
@@ -115,12 +112,12 @@ def extract(
 def ask(
 	query: str,
 	openrouter_key: Annotated[str, typer.Option(envvar="OPENROUTER_API_KEY", prompt=True)],
-	top_k: Annotated[int, typer.Option()] = 5,
+	top_k: Annotated[int, typer.Option(help="How many results are used as context to answer the query")] = 5,
 	embedding_model: Annotated[str, typer.Option()] = "qwen/qwen3-embedding-8b",
 	answer_model: Annotated[str, typer.Option()] = "openai/gpt-4o-mini",
+	show_prompt: Annotated[bool, typer.Option(help="Show the prompt before it's fed into the answer model")] = False,
 ) -> None:
-	file = open("embedded.json", "r")
-	data = json.load(file)
+	data = load_json("embedded.json")
 	print("loaded embeddings from embedded.json")
 
 	summaries = [Summary(topic=item["topic"], info=item["info"]) for item in data["summaries"]]
@@ -131,10 +128,15 @@ def ask(
 	results = search_embeddings(client, query, summaries, embeddings, top_k, embedding_model)
 	print(f"found {len(results)} results with relatedness {['{:.3f}'.format(r[1]) for r in results]}")
 
+	prompt = create_prompt(query, results)
+	if show_prompt:
+		print("\n[bold]prompt:[/bold]\n")
+		print(prompt)
+
 	print("\n[bold]answer:[/bold]\n")
 	full_response = ""
 	with Live(Markdown(""), refresh_per_second=10) as live:
-		for chunk in answer_query_streaming(client, query, results, answer_model):
+		for chunk in answer_query_streaming(client, prompt, answer_model):
 			full_response += chunk
 			live.update(Markdown(full_response))
 	print()
