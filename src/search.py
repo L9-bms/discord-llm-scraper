@@ -106,7 +106,12 @@ def fetch_messages(
 
 
 def traverse_reply_chain(
-	session: requests.Session, root_message: Message, context_messages: int, seen_ids: set[str]
+	session: requests.Session,
+	root_message: Message,
+	context_messages: int,
+	seen_ids: set[str],
+	chain_depth: int,
+	chain_path: Optional[list[str]] = None,
 ) -> list[Message]:
 	"""https://docs.discord.food/resources/message#get-messages"""
 	chain: list[Message] = []
@@ -114,14 +119,19 @@ def traverse_reply_chain(
 	chain.append(root_message)
 	current_message = root_message
 
+	if chain_path is None:
+		chain_path = [root_message.id]
+		prefix = f"[{root_message.id}]"
+	else:
+		chain_path = chain_path + [root_message.id]
+		prefix = f"[{'->'.join(chain_path)}]"
+
 	if not current_message.has_reference():
-		print(f"[{root_message.id}] no message reference, adding as-is")
+		print(f"{prefix} no message reference, adding as-is")
 		return chain
 
 	while current_message.has_reference():
-		print(
-			f"[{root_message.id}] fetching {context_messages} messages around {current_message.referenced_message_id}..."
-		)
+		print(f"{prefix} fetching {context_messages} messages around {current_message.referenced_message_id}...")
 		r = session.get(
 			f"{DISCORD_BASE_URL}/channels/{current_message.referenced_channel_id}/messages",
 			params={"around": current_message.referenced_message_id, "limit": context_messages},
@@ -141,19 +151,32 @@ def traverse_reply_chain(
 				seen_ids.add(fetched["id"])
 				message_block.append(Message.from_api_response(fetched))
 
+		if chain_depth > 1:
+			for msg in message_block:
+				if msg.has_reference() and msg.id != current_message.referenced_message_id:
+					print(f"{prefix} traversing side chain to {msg.id}")
+					side_chain = traverse_reply_chain(
+						session, msg, context_messages, seen_ids, chain_depth - 1, chain_path
+					)
+					for side_msg in side_chain:
+						if side_msg.id not in [m.id for m in chain] and side_msg.id not in [
+							m.id for m in message_block
+						]:
+							message_block.append(side_msg)
+
 		# should already be returned in reverse chronological order by discord
 		message_block.reverse()
 		chain = message_block + chain
 
 		if next_message is None:
-			print(f"[{root_message.id}] could not find next message to continue chain!")
+			print(f"{prefix} could not find next message to continue chain!")
 			break
 
 		current_message = Message.from_api_response(next_message)
 
 		sleep(1)
 
-	print(f"[{root_message.id}] reply chain ended")
+	print(f"{prefix} reply chain ended")
 
 	sleep(1)
 
