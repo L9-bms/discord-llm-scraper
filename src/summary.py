@@ -33,6 +33,7 @@ Rules:
 CONVERSATION: {conversation}
 """,
 		text_format=Output,
+		extra_body={"plugins": [{"id": "response-healing"}]},
 	)
 
 	output = response.output_parsed

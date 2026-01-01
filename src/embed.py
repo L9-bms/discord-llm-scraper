@@ -68,6 +68,7 @@ Summary 2:
 Topic: {summary2.topic}
 Info: {summary2.info}""",
 		text_format=Summary,
+		extra_body={"plugins": [{"id": "response-healing"}]},
 	)
 
 	merged = response.output_parsed
