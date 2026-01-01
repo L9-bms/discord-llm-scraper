@@ -14,13 +14,14 @@ implementing the feature.
 ## How
 
 1. Search - Use Discord user API to find messages containing relevant keywords
-2. Traverse - Follow reply chains and surrounding context messages to build conversation chains
+2. Traverse - Follow reply chains and surrounding context messages to build conversations, optionally recusively (depth=1 by default)
 
 ![reply chain traversal](docs/img/chain-crawl.png)
 
-3. Extract - Summarizes conversations into knowledge chunks using LLMs
-4. Index - Computes embeddings for semantic search capabilities
-5. Query - RAG-powered question answering using conversation context
+3. Extract - Summarizes conversations into knowledge chunks using LLM
+4. Merge - Optionally merge similar summaries using LLM
+5. Index - Computes embeddings for summaries
+6. Query - Feed the top-k related context to LLM along with query to get an answer
 
 ## Installation
 
@@ -32,21 +33,9 @@ uv install
 
 ## Usage
 
-### 1. Search and Index Conversations
-
 ```bash
 uv run python src/main.py search <guild_id> "your search term" --token <discord_token>
-```
-
-### 2. Extract Knowledge and Compute Embeddings
-
-```bash
 uv run python src/main.py extract --openrouter-key <api_key>
-```
-
-### 3. Query the Knowledge Base
-
-```bash
 uv run python src/main.py ask "your query" --openrouter-key <api_key>
 ```
 
@@ -65,7 +54,7 @@ OPENROUTER_API_KEY=your_openrouter_key
 
 ## Potential extensions
 
-- Agentic search - AI search term discovery based on query
+- Integrate with documentation and code
 - Search within specific date ranges
 - Generate markdown/HTML knowledge bases
 
