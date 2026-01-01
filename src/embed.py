@@ -32,3 +32,46 @@ def search_embeddings(
 
 	results = [(summaries[i], float(similarities[i])) for i in top_indices]
 	return results
+
+
+def find_similar_pairs(embeddings: List[List[float]], threshold: float) -> List[tuple[int, int, float]]:
+	"""returns a list of tuples of (index1, index2, similarity) in descending order"""
+	embeddings_array = np.array(embeddings)
+
+	# cosine similarity matrix
+	norms = np.linalg.norm(embeddings_array, axis=1, keepdims=True)
+	normalized = embeddings_array / norms
+	similarity_matrix = np.dot(normalized, normalized.T)
+
+	similar_pairs = []
+	n = len(embeddings)
+	for i in range(n):
+		for j in range(i + 1, n):
+			if similarity_matrix[i, j] >= threshold:
+				similar_pairs.append((i, j, float(similarity_matrix[i, j])))
+
+	similar_pairs.sort(key=lambda x: x[2], reverse=True)
+	return similar_pairs
+
+
+def merge_summaries(client: OpenAI, summary1: Summary, summary2: Summary, model: str) -> Summary:
+	response = client.responses.parse(
+		model=model,
+		instructions="You are a knowledge consolidation system.",
+		input=f"""Merge these two similar summaries into one:
+
+Summary 1:
+Topic: {summary1.topic}
+Info: {summary1.info}
+
+Summary 2:
+Topic: {summary2.topic}
+Info: {summary2.info}""",
+		text_format=Summary,
+	)
+
+	merged = response.output_parsed
+	if not merged:
+		return summary1
+
+	return Summary(topic=merged.topic, info=merged.info)
