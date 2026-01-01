@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated
 
 import requests
@@ -404,6 +405,14 @@ def auto(
 		save_embeddings(summaries, embeddings)
 
 	answer_query(client, query, summaries, embeddings, top_k, embedding_model, answer_model, show_prompt)
+
+
+@app.command(help="Removes saved messages and embedded summaries")
+def clean() -> None:
+	files = [Path("messages.json"), Path("embedded.json")]
+	for file in files:
+		if file.exists():
+			file.unlink()
 
 
 if __name__ == "__main__":

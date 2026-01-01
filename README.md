@@ -36,6 +36,18 @@ uv install
 ```bash
 uv run python src/main.py search <guild_id> "your search term" --token <discord_token>
 uv run python src/main.py extract --openrouter-key <api_key>
+uv run python src/main.py merge --openrouter-key <api_key>
+uv run python src/main.py ask "your query" --openrouter-key <api_key>
+
+uv run python src/main.py clean
+```
+
+or
+
+```bash
+uv run python src/main.py auto <guild_id> "your query" --openrouter-key <api_key>
+
+# subsequent queries
 uv run python src/main.py ask "your query" --openrouter-key <api_key>
 ```
 
